@@ -15,41 +15,51 @@ import pandas as pd
 import matplotlib as mpl
 from matplotlib import font_manager
 
+from matplotlib.text import Text
+
+KOREAN_FONT_PROP = None
+
 
 def set_korean_matplotlib_font() -> None:
-    """Streamlit Cloud/Linux 환경에서 Matplotlib 한글 깨짐을 방지한다."""
-    candidates = [
-        "Noto Sans CJK KR",
-        "Noto Sans CJK JP",
-        "Noto Serif CJK KR",
-        "Noto Sans KR",
-        "NanumGothic",
-        "Malgun Gothic",
-        "AppleGothic",
+    """Matplotlib 저장 이미지에서 한글이 깨지지 않도록 폰트를 강제 설정한다."""
+    global KOREAN_FONT_PROP
+
+    font_paths = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "C:/Windows/Fonts/malgun.ttf",
+        "/System/Library/Fonts/AppleGothic.ttf",
     ]
 
-    available_fonts = {font.name for font in font_manager.fontManager.ttflist}
+    for font_path in font_paths:
+        path = Path(font_path)
+        if path.exists():
+            font_manager.fontManager.addfont(str(path))
+            KOREAN_FONT_PROP = font_manager.FontProperties(fname=str(path))
+            font_name = KOREAN_FONT_PROP.get_name()
 
-    for font_name in candidates:
-        if font_name in available_fonts:
             mpl.rcParams["font.family"] = font_name
-            break
-    else:
-        font_paths = [
-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
-            "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-        ]
+            mpl.rcParams["axes.unicode_minus"] = False
+            plt.rcParams["font.family"] = font_name
+            plt.rcParams["axes.unicode_minus"] = False
+            return
 
-        for font_path in font_paths:
-            if Path(font_path).exists():
-                font_manager.fontManager.addfont(font_path)
-                font_prop = font_manager.FontProperties(fname=font_path)
-                mpl.rcParams["font.family"] = font_prop.get_name()
-                break
-
+    # fallback
     mpl.rcParams["axes.unicode_minus"] = False
+    plt.rcParams["axes.unicode_minus"] = False
 
+
+def apply_korean_font_to_figure(fig=None) -> None:
+    """이미 생성된 Matplotlib figure 안의 모든 텍스트 객체에 한글 폰트를 강제 적용한다."""
+    if KOREAN_FONT_PROP is None:
+        return
+
+    if fig is None:
+        fig = plt.gcf()
+
+    for text in fig.findobj(match=Text):
+        text.set_fontproperties(KOREAN_FONT_PROP)
 
 set_korean_matplotlib_font()
 
