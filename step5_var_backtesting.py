@@ -15,6 +15,56 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+import matplotlib as mpl
+from matplotlib import font_manager
+from matplotlib.text import Text
+
+KOREAN_FONT_PROP = None
+
+
+def set_korean_matplotlib_font() -> None:
+    """VaR 백테스팅 Matplotlib 차트에서 한글 깨짐을 방지한다."""
+    global KOREAN_FONT_PROP
+
+    font_paths = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "C:/Windows/Fonts/malgun.ttf",
+        "/System/Library/Fonts/AppleGothic.ttf",
+    ]
+
+    for font_path in font_paths:
+        path = Path(font_path)
+        if path.exists():
+            font_manager.fontManager.addfont(str(path))
+            KOREAN_FONT_PROP = font_manager.FontProperties(fname=str(path))
+            font_name = KOREAN_FONT_PROP.get_name()
+
+            mpl.rcParams["font.family"] = font_name
+            mpl.rcParams["axes.unicode_minus"] = False
+            plt.rcParams["font.family"] = font_name
+            plt.rcParams["axes.unicode_minus"] = False
+            return
+
+    mpl.rcParams["axes.unicode_minus"] = False
+    plt.rcParams["axes.unicode_minus"] = False
+
+
+def apply_korean_font_to_figure(fig=None) -> None:
+    """이미 생성된 Matplotlib figure 안의 모든 텍스트에 한글 폰트를 강제 적용한다."""
+    if KOREAN_FONT_PROP is None:
+        return
+
+    if fig is None:
+        fig = plt.gcf()
+
+    for text in fig.findobj(match=Text):
+        text.set_fontproperties(KOREAN_FONT_PROP)
+
+
+set_korean_matplotlib_font()
+
 from config import (
     BACKTEST_CONFIDENCE_LEVELS,
     BACKTEST_WINDOW,
@@ -328,6 +378,7 @@ def plot_backtest_results(backtest: pd.DataFrame) -> Path:
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(VAR_BACKTEST_CHART_FILE, dpi=150)
     plt.close()
     return VAR_BACKTEST_CHART_FILE
