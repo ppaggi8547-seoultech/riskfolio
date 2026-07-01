@@ -1,0 +1,13 @@
+# 실행 결과 데이터는 재생성 가능하므로 Git에서 제외
+data/
+outputs/
+
+# Python 캐시와 가상환경
+__pycache__/
+*.py[cod]
+.venv/
+
+# VS Code / OS 잡파일
+.vscode/
+.DS_Store
+Thumbs.db

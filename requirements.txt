@@ -1,0 +1,8 @@
+# 다자산 포트폴리오 VaR 리스크 측정 프로젝트
+pandas>=2.0
+numpy>=1.24
+matplotlib>=3.7
+finance-datareader>=0.9.100
+streamlit>=1.30
+plotly>=5.18
+yfinance>=0.2
