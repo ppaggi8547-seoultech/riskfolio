@@ -12,6 +12,47 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+import matplotlib as mpl
+from matplotlib import font_manager
+
+
+def set_korean_matplotlib_font() -> None:
+    """Streamlit Cloud/Linux 환경에서 Matplotlib 한글 깨짐을 방지한다."""
+    candidates = [
+        "Noto Sans CJK KR",
+        "Noto Sans CJK JP",
+        "Noto Serif CJK KR",
+        "Noto Sans KR",
+        "NanumGothic",
+        "Malgun Gothic",
+        "AppleGothic",
+    ]
+
+    available_fonts = {font.name for font in font_manager.fontManager.ttflist}
+
+    for font_name in candidates:
+        if font_name in available_fonts:
+            mpl.rcParams["font.family"] = font_name
+            break
+    else:
+        font_paths = [
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+            "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        ]
+
+        for font_path in font_paths:
+            if Path(font_path).exists():
+                font_manager.fontManager.addfont(font_path)
+                font_prop = font_manager.FontProperties(fname=font_path)
+                mpl.rcParams["font.family"] = font_prop.get_name()
+                break
+
+    mpl.rcParams["axes.unicode_minus"] = False
+
+
+set_korean_matplotlib_font()
+
 from config import (
     ASSET_MASTER_FILE,
     ASSET_RISK_SUMMARY_FILE,
