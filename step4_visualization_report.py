@@ -304,6 +304,7 @@ def create_portfolio_value_chart(portfolio_values: pd.DataFrame) -> Path:
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
@@ -320,6 +321,7 @@ def create_cumulative_return_chart(portfolio_returns: pd.DataFrame) -> Path:
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
@@ -340,6 +342,7 @@ def create_return_distribution_chart(portfolio_returns: pd.DataFrame, historical
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
@@ -356,6 +359,7 @@ def create_drawdown_chart(drawdown: pd.DataFrame) -> Path:
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
@@ -376,6 +380,7 @@ def create_asset_weights_chart(position_summary: pd.DataFrame, name_map: dict[st
     plt.xticks(rotation=25, ha="right")
     plt.grid(axis="y", alpha=0.3)
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
@@ -401,6 +406,7 @@ def create_correlation_heatmap(correlation: pd.DataFrame, name_map: dict[str, st
                 plt.text(col, row, f"{matrix.iloc[row, col]:.2f}", ha="center", va="center", fontsize=9)
         plt.title("자산별 수익률 상관관계")
     plt.tight_layout()
+    apply_korean_font_to_figure(plt.gcf())
     plt.savefig(output_path, dpi=150)
     plt.close()
     return output_path
