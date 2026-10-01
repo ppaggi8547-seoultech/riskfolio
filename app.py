@@ -49,7 +49,7 @@ except ImportError:
     run_all_main = None
 
 
-KR_EDITOR_COLUMNS = ["종목코드", "수량", "매수가격_원"]
+KR_EDITOR_COLUMNS = ["종목코드", "종목명", "수량", "매수가격_원"]
 US_EDITOR_COLUMNS = ["티커", "수량", "매수가격_달러", "매수일자"]
 NO_ANALYSIS_MESSAGE = "아직 분석 결과가 없습니다. Portfolio Input 탭에서 포트폴리오를 입력한 뒤 전체 분석 실행을 눌러주세요."
 
@@ -999,6 +999,61 @@ def build_config_table(
     return pd.DataFrame(rows)
 
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def load_krx_stock_name_map() -> dict[str, str]:
+    """KRX 종목코드 → 종목명 매핑을 가져온다."""
+    try:
+        import FinanceDataReader as fdr
+
+        listing = fdr.StockListing("KRX")
+        listing["Code"] = listing["Code"].astype(str).str.zfill(6)
+        listing["Name"] = listing["Name"].astype(str)
+        return dict(zip(listing["Code"], listing["Name"]))
+    except Exception:
+        return {}
+
+
+def normalize_kr_code_for_lookup(value: object) -> str:
+    """종목명 조회용 한국 종목코드를 6자리 문자열로 정리한다."""
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return ""
+    if text.endswith(".0"):
+        text = text[:-2]
+    if not text.isdigit():
+        return text
+    return text.zfill(6)
+
+
+def lookup_kr_stock_name(value: object, name_map: dict[str, str]) -> str:
+    """종목코드에 대응하는 종목명을 반환한다."""
+    code = normalize_kr_code_for_lookup(value)
+    if code == "":
+        return ""
+    if not code.isdigit() or len(code) > 6:
+        return "확인 필요"
+    return name_map.get(code.zfill(6), "확인 필요")
+
+
+def refresh_kr_stock_names(kr_df: pd.DataFrame, name_map: dict[str, str]) -> pd.DataFrame:
+    """한국주식 입력 DataFrame에 종목명 컬럼을 갱신한다."""
+    refreshed = kr_df.copy()
+    if "종목코드" not in refreshed.columns:
+        refreshed["종목코드"] = ""
+    if "종목명" not in refreshed.columns:
+        refreshed.insert(1, "종목명", "")
+
+    refreshed["종목명"] = refreshed["종목코드"].apply(
+        lambda code: lookup_kr_stock_name(code, name_map)
+    )
+    for column in KR_EDITOR_COLUMNS:
+        if column not in refreshed.columns:
+            refreshed[column] = ""
+    return refreshed[KR_EDITOR_COLUMNS]
+
+
 def empty_kr_editor_frame() -> pd.DataFrame:
     """한국주식 입력용 빈 DataFrame."""
     return pd.DataFrame(columns=KR_EDITOR_COLUMNS)
@@ -1013,8 +1068,8 @@ def example_kr_editor_frame() -> pd.DataFrame:
     """예시 한국주식 입력값."""
     return pd.DataFrame(
         [
-            {"종목코드": "005930", "수량": 10.0, "매수가격_원": 70_000.0},
-            {"종목코드": "000660", "수량": 5.0, "매수가격_원": 180_000.0},
+            {"종목코드": "005930", "종목명": "삼성전자", "수량": 10.0, "매수가격_원": 70_000.0},
+            {"종목코드": "000660", "종목명": "SK하이닉스", "수량": 5.0, "매수가격_원": 180_000.0},
         ],
         columns=KR_EDITOR_COLUMNS,
     )
@@ -1129,6 +1184,7 @@ def portfolio_config_to_editor_frames(config: dict[str, Any]) -> tuple[pd.DataFr
         kr_rows.append(
             {
                 "종목코드": str(item.get("ticker", "")).strip(),
+                "종목명": "",
                 "수량": item.get("quantity"),
                 "매수가격_원": item.get("purchase_price"),
             }
@@ -1509,6 +1565,10 @@ def render_portfolio_input_tab(data: dict[str, Any]) -> None:
     config = data["config"]
     initialize_portfolio_input_state(config)
 
+    kr_name_map = load_krx_stock_name_map()
+    if not kr_name_map:
+        st.caption("종목명 조회 데이터를 불러오지 못했습니다. 종목코드로 분석은 계속 가능합니다.")
+
     if success_message := st.session_state.pop("analysis_success_message", None):
         st.success(success_message)
 
@@ -1536,14 +1596,24 @@ def render_portfolio_input_tab(data: dict[str, Any]) -> None:
     with st.form("portfolio_input_form", clear_on_submit=False):
         st.markdown("#### 한국주식 입력")
         st.caption("한국주식은 6자리 종목코드, 보유 수량, 원화 매수가격을 입력하면 돼요.")
+        kr_input_df = refresh_kr_stock_names(
+            st.session_state.get("kr_editor_df", empty_kr_editor_frame()),
+            kr_name_map,
+        )
         kr_df = st.data_editor(
-            st.session_state["kr_editor_df"],
+            kr_input_df,
             num_rows="dynamic",
             use_container_width=True,
+            hide_index=True,
             column_config={
                 "종목코드": st.column_config.TextColumn(
                     "종목코드",
                     help="한국주식 6자리 종목코드. 예: 005930",
+                ),
+                "종목명": st.column_config.TextColumn(
+                    "종목명",
+                    help="종목코드를 기준으로 자동 조회된 회사명입니다.",
+                    disabled=True,
                 ),
                 "수량": st.column_config.NumberColumn(
                     "수량",
@@ -1605,7 +1675,9 @@ def render_portfolio_input_tab(data: dict[str, Any]) -> None:
             key=f"cash_krw_input_{editor_version}",
         )
 
-        col_save, col_run = st.columns(2)
+        col_check, col_save, col_run = st.columns(3)
+        with col_check:
+            check_name_clicked = st.form_submit_button("종목명 확인", use_container_width=True)
         with col_save:
             save_clicked = st.form_submit_button(
                 "포트폴리오 저장",
@@ -1615,11 +1687,26 @@ def render_portfolio_input_tab(data: dict[str, Any]) -> None:
         with col_run:
             run_clicked = st.form_submit_button("전체 분석 실행", use_container_width=True)
 
-    if save_clicked or run_clicked:
+    if check_name_clicked or save_clicked or run_clicked:
+        kr_df = refresh_kr_stock_names(kr_df, kr_name_map)
         st.session_state["kr_editor_df"] = kr_df
         st.session_state["us_editor_df"] = us_df
         st.session_state["cash_krw_value"] = cash_krw
+        st.session_state["input_version"] += 1
+        # 새 위젯으로 종목명을 먼저 표시하고, 저장/분석은 다음 렌더링에서 한 번만 실행한다.
+        if save_clicked or run_clicked:
+            st.session_state["portfolio_input_pending_action"] = "run" if run_clicked else "save"
+        st.rerun()
 
+    invalid_kr_mask = (
+        kr_input_df["종목코드"].astype(str).str.strip().ne("")
+        & kr_input_df["종목명"].astype(str).eq("확인 필요")
+    )
+    if invalid_kr_mask.any():
+        st.warning("일부 한국주식 종목코드를 확인할 수 없습니다. 종목코드가 6자리 숫자인지 확인하세요.")
+
+    pending_action = st.session_state.pop("portfolio_input_pending_action", None)
+    if pending_action in ("save", "run"):
         try:
             config_to_save = build_portfolio_config_from_editor(kr_df, us_df, cash_krw)
             saved_config = save_portfolio_config_from_app(config_to_save)
@@ -1628,7 +1715,7 @@ def render_portfolio_input_tab(data: dict[str, Any]) -> None:
         else:
             st.session_state["last_saved_config"] = saved_config
             st.cache_data.clear()
-            if run_clicked:
+            if pending_action == "run":
                 run_analysis_from_app()
             else:
                 st.success(f"저장 완료: {PORTFOLIO_CONFIG_FILE}")
